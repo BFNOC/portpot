@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>portpot</title>
+<style>
+:root{
+  --bg:#0b0e12;--panel:#11161c;--panel2:#161c24;--line:#1f2730;--fg:#d7dee7;--dim:#7d8894;--muted:#3f4954;
+  --in:#f5b041;--out:#4fc3f7;--note:#c792ea;--ok:#3ddc84;--err:#ff5c5c;--sel:#1c2a3b;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Cascadia Mono","JetBrains Mono","Sarasa Mono SC","Noto Sans Mono CJK SC",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:12.5px/1.45 var(--mono);background:var(--bg);color:var(--fg);display:grid;grid-template-rows:auto 1fr;overflow:hidden;scrollbar-color:#2a333d var(--bg)}
+a{color:var(--out)}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.logo{font-size:18px;font-weight:700;letter-spacing:.04em;color:#fff}
+.logo::before{content:"\25A3  ";color:var(--in)}
+.tag{color:var(--dim);font-size:11.5px}
+.status{display:flex;align-items:center;gap:14px;color:var(--dim);white-space:nowrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
+.dot.open{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.stat.ok .dot{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.stat.err{color:var(--err)}.stat.err .dot{background:var(--err)}
+.stat.off .dot{background:var(--in)}
+label{cursor:pointer;user-select:none}
+main{display:grid;grid-template-columns:minmax(560px,40%) 1fr;min-height:0}
+aside{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;padding:8px;border-bottom:1px solid var(--line);background:var(--panel);align-items:center}
+.filters .row2{display:flex;justify-content:space-between;align-items:center;grid-column:1/-1;color:var(--dim)}
+select,input[type=search]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:4px 6px;min-width:0;width:100%}
+select:focus,input:focus,button:focus-visible,tr:focus-visible{outline:1px solid var(--in);outline-offset:-1px}
+.ptitle{padding:5px 8px;color:var(--dim);font-size:11px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--line);background:var(--panel)}
+.ptitle small{text-transform:none;letter-spacing:0;margin-left:8px;color:var(--muted)}
+.summary{max-height:32%;overflow:auto;border-bottom:1px solid var(--line);flex:none}
+.list{flex:1;overflow:auto;min-height:0}
+table{border-collapse:collapse;width:100%}
+th{position:sticky;top:0;background:var(--panel2);color:var(--dim);font-weight:500;text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.05em;z-index:1}
+td{padding:3px 8px;border-bottom:1px solid #141920;white-space:nowrap;vertical-align:top}
+.r{text-align:right}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--panel2)}
+#list tr.sel td{background:var(--sel)}
+#list tr.sel td:first-child{box-shadow:inset 3px 0 var(--in)}
+#sum tr.on td{background:var(--sel)}
+tr.hide{display:none}
+@keyframes flash{from{background:rgba(245,176,65,.32)}to{background:transparent}}
+tr.fresh{animation:flash 15s ease-out forwards}
+tr.fresh .c-id::before{content:"\25CF ";color:var(--ok)}
+.c-id{color:var(--dim)}.c-time{color:var(--dim)}
+.c-remote{color:var(--fg)}
+.c-route .net{color:var(--muted)}
+.c-route .proto{margin-left:6px;font-size:11px}
+.p-pjl{color:var(--in)}.p-http,.p-https{color:var(--out)}.p-snmp,.p-udp{color:var(--note)}.p-raw{color:var(--dim)}
+.c-in{color:var(--in)}.c-out{color:var(--out)}
+.c-state{color:var(--dim)}
+.chip{display:inline-block;padding:0 4px;margin:0 3px 1px 0;border:1px solid var(--line);border-radius:2px;font-size:11px;color:var(--dim)}
+.empty,.hint{padding:24px 16px;color:var(--muted);text-align:center}
+section{display:flex;flex-direction:column;min-height:0;min-width:0}
+.dhead{padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+.dhead .k{color:var(--dim);font-size:11px;letter-spacing:.05em;margin-right:5px}
+.dhead .big{font-size:15px;font-weight:700;color:#fff}
+#d-remote{color:var(--in);font-weight:700;font-size:14px;word-break:break-all}
+.dhead .grow{flex:1}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+button,a.btn{font:inherit;font-size:11px;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:3px;padding:1px 7px;cursor:pointer;text-decoration:none;line-height:1.5}
+button:hover,a.btn:hover{color:var(--fg);border-color:var(--dim)}
+button.on{color:#000;background:var(--fg);border-color:var(--fg)}
+a.btn.in{color:var(--in);border-color:var(--in)}a.btn.out{color:var(--out);border-color:var(--out)}
+.derr{padding:8px 14px;color:var(--err);border-bottom:1px solid var(--line);white-space:pre-wrap;word-break:break-all}
+.timeline{flex:1;overflow:auto;padding:10px 14px;min-height:0}
+.ev{margin:0 0 10px;border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:4px;background:var(--panel)}
+.ev-in{border-left-color:var(--in)}.ev-out{border-left-color:var(--out)}.ev-note{border-left-color:var(--note);background:#161222}
+.ev-head{display:flex;align-items:center;gap:10px;padding:4px 10px;border-bottom:1px solid var(--line);color:var(--dim);flex-wrap:wrap}
+.ev-note .ev-head{border-bottom:0;padding-bottom:0}
+.ev-idx{color:var(--muted)}
+.ev-dir{font-weight:700;padding:0 6px;border-radius:2px;color:#000}
+.ev-in .ev-dir{background:var(--in)}.ev-out .ev-dir{background:var(--out)}.ev-note .ev-dir{background:var(--note)}
+.ev-btns{margin-left:auto;display:flex;gap:4px}
+.ev-notetext{padding:4px 12px 9px;color:#e8dcff;font-size:13.5px;white-space:pre-wrap;word-break:break-all}
+.ev-hint{padding:3px 10px;color:var(--dim);border-bottom:1px solid var(--line);font-size:11.5px}
+pre.ev-body{margin:0;padding:8px 10px;overflow:auto;max-height:60vh;font:inherit;line-height:1.35;white-space:pre;tab-size:8;color:#c9d1d9}
+pre.ev-body[data-view=text]{white-space:pre-wrap;word-break:break-all}
+pre.ev-body.pending{min-height:2.4em;color:var(--muted)}
+.trunc{padding:5px 10px;border-top:1px dashed var(--line);color:var(--in);font-size:11.5px}
+.trunc a{margin-left:8px}
+.kind{font-size:10.5px;padding:0 5px;border-radius:2px;border:1px solid;margin-right:4px;font-weight:600;line-height:1.4}
+.kind-uel{color:#ff7ab6;border-color:#ff7ab6}.kind-pjl{color:#ffd166;border-color:#ffd166}.kind-ps{color:#9ef0a0;border-color:#9ef0a0}
+.kind-pcl{color:#ffb86c;border-color:#ffb86c}.kind-http{color:#7cc4ff;border-color:#7cc4ff}.kind-tls{color:#b39cff;border-color:#b39cff}.kind-ber{color:#c792ea;border-color:#c792ea}
+.hl-uel{color:#ff7ab6;font-weight:700}.hl-pcl{color:#ffb86c;font-weight:700}
+.hl-pjl{color:#ffd166}.hl-ps{color:#9ef0a0}.hl-http{color:#7cc4ff;font-weight:700}.hl-hdr{color:#8fd3ff}
+.ctl{color:#5c6773}
+@media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:1fr 1fr}aside{border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">portpot</span>
+    <span class="tag">伪装打印机蜜罐 (HP LaserJet) · 记录每一个发来的字节</span>
+  </div>
+  <div class="status">
+    <label><input type="checkbox" id="auto" checked> 自动刷新 2s</label>
+    <span id="stat" class="stat"><i class="dot"></i><span id="stat-text">连接中…</span></span>
+  </div>
+</header>
+<main>
+  <aside>
+    <div class="filters">
+      <select id="f-proto" title="按端口/协议筛选"><option value="">全部端口 / 协议</option></select>
+      <input id="f-remote" type="search" placeholder="远端 IP 包含…" autocomplete="off" spellcheck="false">
+      <div class="row2">
+        <label><input type="checkbox" id="f-nonzero"> 隐藏入向 0 字节的会话</label>
+        <span>显示 <span id="count">0 / 0</span></span>
+      </div>
+    </div>
+    <div class="summary">
+      <div class="ptitle">远端汇总 <small>谁在扫描 · 点击行按 IP 筛选</small></div>
+      <table id="sum">
+        <thead><tr><th>远端 IP</th><th class="r">会话</th><th>触及端口</th><th class="r">入向</th><th>最近</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="hint" id="sum-empty">暂无数据</div>
+    </div>
+    <div class="list">
+      <table id="list">
+        <thead><tr><th>#</th><th>时间</th><th>远端</th><th>端口 / 协议</th><th class="r">入</th><th class="r">出</th><th>状态</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="hint" id="list-empty">尚无会话 — 等待有人来连打印机…</div>
+    </div>
+  </aside>
+  <section>
+    <div class="dhead" id="dhead" hidden>
+      <span class="big" id="d-id"></span>
+      <span id="d-remote"></span>
+      <span><span class="k">端口</span><span id="d-route"></span></span>
+      <span><span class="k">开始</span><span id="d-start"></span></span>
+      <span><span class="k">结束</span><span id="d-end"></span></span>
+      <span><span class="k">字节</span><span id="d-bytes"></span></span>
+      <span class="grow"></span>
+      <span class="btns">
+        <span class="k">默认视图</span>
+        <button id="v-auto" class="on" title="按内容自动选择文本或 HEX">自动</button><button id="v-text">文本</button><button id="v-hex">HEX</button>
+        <a class="btn in" id="dl-in" download title="入向全部字节拼接，可另存为 .prn/.ps/.pcl">下载入向原始数据</a>
+        <a class="btn out" id="dl-out" download>下载出向原始数据</a>
+      </span>
+    </div>
+    <div class="derr" id="derr" hidden></div>
+    <div class="empty" id="empty">&larr; 选择一个会话，查看字节级时间线</div>
+    <div class="hint" id="tl-empty" hidden>该会话没有任何事件</div>
+    <div class="timeline" id="timeline"></div>
+  </section>
+</main>
+<noscript><div class="empty">需要启用 JavaScript</div></noscript>
+<script>
+'use strict';
+/* 所有展示内容都来自攻击者：只用 textContent / createElement，绝不 innerHTML。 */
+const LIMIT = 64 * 1024;          // 每个事件最多渲染 64 KiB
+const POLL_MS = 2000;
+const HEX = Array.from({length: 256}, (_, i) => i.toString(16).padStart(2, '0'));
+const KIND_LABEL = {uel: 'UEL', pjl: 'PJL', ps: 'PostScript', pcl: 'PCL', http: 'HTTP', tls: 'TLS', ber: 'BER/SNMP'};
+const DIR_LABEL = {in: '入', out: '出', note: '注'};
+const PROTOS = new Set(['raw', 'pjl', 'http', 'https', 'udp', 'snmp']);
+const HTTP_RE = /^(?:GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH|CONNECT|TRACE|PROPFIND) \S+ HTTP\/\d/;
+const TOKEN_RE = /\x1b%-12345X|\x1bE|[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
+const TLS_TYPE = {20: 'ChangeCipherSpec', 21: 'Alert', 22: 'Handshake', 23: 'ApplicationData'};
+const TLS_HS = {1: 'ClientHello', 2: 'ServerHello', 11: 'Certificate', 16: 'ClientKeyExchange'};
+
+const $ = id => document.getElementById(id);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+const pad = (n, w) => String(n).padStart(w || 2, '0');
+
+// ---------- formatting ----------
+function fmtTime(iso, mode) {           // mode: 'full' | 'short' | 'clock'
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso ?? '');
+  const clock = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+  if (mode === 'clock') return clock;
+  const md = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return mode === 'short' ? `${md} ${clock}` : `${d.getFullYear()}-${md} ${clock}`;
+}
+function fmtDur(ms) {
+  if (!(ms >= 0)) return '?';
+  if (ms < 1000) return ms + ' ms';
+  if (ms < 60000) return (ms / 1000).toFixed(2) + ' s';
+  return Math.floor(ms / 60000) + ' m ' + Math.round((ms % 60000) / 1000) + ' s';
+}
+function fmtBytes(n) {
+  n = Number(n) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KiB';
+  return (n / 1048576).toFixed(2) + ' MiB';
+}
+function ipOf(remote) {
+  remote = String(remote ?? '');
+  if (remote[0] === '[') { const i = remote.indexOf(']'); return i > 0 ? remote.slice(1, i) : remote; }
+  const i = remote.lastIndexOf(':');
+  return i > 0 ? remote.slice(0, i) : remote;
+}
+function rawUrl(id, dir) {
+  return Number.isInteger(id) && (dir === 'in' || dir === 'out') ? `/api/sessions/${id}/raw?dir=${dir}` : '';
+}
+
+// ---------- bytes ----------
+function b64Len(s) {                    // Go 的 []byte 是带 padding 的标准 base64
+  const n = s.length;
+  if (!n) return 0;
+  let p = 0;
+  if (s[n - 1] === '=') p++;
+  if (s[n - 2] === '=') p++;
+  return Math.floor(n * 3 / 4) - p;
+}
+function b64Bytes(s, max) {             // 只解码前 max 字节，避免多 MB 事件卡住页面
+  const chars = Math.ceil(max / 3) * 4;
+  let bin;
+  try { bin = atob(s.length > chars ? s.slice(0, chars) : s); } catch (e) { return new Uint8Array(0); }
+  const n = Math.min(bin.length, max);
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function latin1(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return s;
+}
+function decodeText(bytes) {            // 合法 UTF-8 就按 UTF-8，否则 latin1；截断尾部的半个字符不算错
+  try { return new TextDecoder('utf-8', {fatal: true}).decode(bytes, {stream: true}); } catch (e) { return latin1(bytes); }
+}
+function hexDump(bytes) {               // 同 hexdump -C
+  const lines = [];
+  for (let off = 0; off < bytes.length; off += 16) {
+    let hex = '', asc = '';
+    for (let i = 0; i < 16; i++) {
+      if (i === 8) hex += ' ';
+      if (off + i < bytes.length) {
+        const b = bytes[off + i];
+        hex += HEX[b] + ' ';
+        asc += b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : '.';
+      } else hex += '   ';
+    }
+    lines.push(off.toString(16).padStart(8, '0') + '  ' + hex + ' |' + asc + '|');
+  }
+  return lines.join('\n');
+}
+
+// ---------- 辅助解析（启发式，只看前 256 字节） ----------
+function detect(head, proto) {
+  const k = [];
+  if (head.includes('\x1b%-12345X')) k.push('uel');
+  if (head.includes('@PJL')) k.push('pjl');
+  if (head.includes('%!PS')) k.push('ps');
+  if (head.includes('\x1bE')) k.push('pcl');
+  if (HTTP_RE.test(head)) k.push('http');
+  if (head.charCodeAt(0) === 0x16 && head.charCodeAt(1) === 0x03) k.push('tls');
+  if (head.charCodeAt(0) === 0x30 && (proto === 'snmp' || proto === 'udp')) k.push('ber');
+  return k;
+}
+function looksText(head) {
+  let p = 0, n = 0;
+  for (let i = 0; i < head.length; i++) {
+    const c = head.charCodeAt(i);
+    if (c >= 0x80) continue;            // 可能是 UTF-8，不计
+    n++;
+    if ((c >= 0x20 && c < 0x7f) || c === 9 || c === 10 || c === 13 || c === 0x1b) p++;
+  }
+  return n === 0 || p / n >= 0.8;
+}
+function tlsHint(b) {
+  if (b.length < 5) return '';
+  let s = `TLS 记录: ${TLS_TYPE[b[0]] || 'type ' + b[0]} ver=0x${HEX[b[1]]}${HEX[b[2]]} len=${(b[3] << 8) | b[4]}`;
+  if (b[0] === 22 && b.length > 5) s += ` handshake=${TLS_HS[b[5]] || b[5]}`;
+  return s;
+}
+function lineClass(line, http) {
+  const s = line.startsWith('\x1b%-12345X') ? line.slice(9) : line;
+  if (s.startsWith('@PJL')) return 'hl-pjl';
+  if (s.startsWith('%!PS')) return 'hl-ps';
+  if (HTTP_RE.test(s)) return 'hl-http';
+  if (http && /^[A-Za-z0-9-]+:\s/.test(s)) return 'hl-hdr';
+  return '';
+}
+function appendEscaped(parent, line, assist) {   // 控制字符显示为 \xHH，UEL / ESC E 高亮
+  TOKEN_RE.lastIndex = 0;
+  let last = 0, m;
+  while ((m = TOKEN_RE.exec(line))) {
+    if (m.index > last) parent.appendChild(document.createTextNode(line.slice(last, m.index)));
+    const t = m[0];
+    if (t.length > 1 && assist) {
+      parent.appendChild(el('span', t === '\x1bE' ? 'hl-pcl' : 'hl-uel', t === '\x1bE' ? '\\x1bE' : '\\x1b%-12345X'));
+    } else {
+      parent.appendChild(el('span', 'ctl', t[0] === '\r' ? '\\r' : '\\x' + HEX[t.charCodeAt(0)]));
+      if (t.length > 1) parent.appendChild(document.createTextNode(t.slice(1)));
+    }
+    last = m.index + t.length;
+  }
+  if (last < line.length) parent.appendChild(document.createTextNode(line.slice(last)));
+}
+function buildText(pre, bytes, ev) {
+  const assist = ev.dir === 'in', http = ev.kinds.includes('http');
+  const lines = decodeText(bytes).split('\n');
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < lines.length; i++) {
+    if (i) frag.appendChild(document.createTextNode('\n'));
+    const span = el('span', assist ? lineClass(lines[i], http) : '');
+    appendEscaped(span, lines[i], assist);
+    frag.appendChild(span);
+  }
+  pre.appendChild(frag);
+}
+
+// ---------- state ----------
+const sessions = new Map();             // id -> {s, tr, cin, cout, cst}
+const combos = new Set();
+const F = {proto: '', remote: '', nonzero: false};
+let firstPoll = true, inflight = false, selTr = null;
+let sel = null;                         // {id, proto, rendered, busy}
+let defaultView = 'auto';
+
+// ---------- session list ----------
+function comboOf(s) { return `${s.net}/${s.port}/${s.proto}`; }
+function match(s) {
+  if (F.proto && comboOf(s) !== F.proto) return false;
+  if (F.remote && !String(s.remote ?? '').toLowerCase().includes(F.remote)) return false;
+  if (F.nonzero && !(s.bytesIn > 0)) return false;
+  return true;
+}
+function setState(td, end) {
+  td.textContent = '';
+  td.appendChild(el('i', 'dot ' + (end ? 'closed' : 'open')));
+  td.appendChild(document.createTextNode(end ? '已关闭' : '连接中'));
+}
+function addRow(s, fresh) {
+  const tr = el('tr');
+  tr.tabIndex = 0;
+  tr.dataset.id = s.id;
+  const proto = PROTOS.has(s.proto) ? s.proto : 'raw';
+  tr.appendChild(el('td', 'c-id', String(s.id)));
+  const tdT = el('td', 'c-time', fmtTime(s.start, 'short'));
+  tdT.title = fmtTime(s.start, 'full');
+  tr.appendChild(tdT);
+  tr.appendChild(el('td', 'c-remote', String(s.remote ?? '')));
+  const tdR = el('td', 'c-route');
+  tdR.appendChild(el('span', 'net', String(s.net ?? '') + '/'));
+  tdR.appendChild(el('b', null, String(s.port ?? '')));
+  tdR.appendChild(el('span', 'proto p-' + proto, String(s.proto ?? '')));
+  tr.appendChild(tdR);
+  const cin = el('td', 'r c-in', fmtBytes(s.bytesIn)), cout = el('td', 'r c-out', fmtBytes(s.bytesOut)), cst = el('td', 'c-state');
+  tr.appendChild(cin); tr.appendChild(cout); tr.appendChild(cst);
+  setState(cst, s.end);
+  if (fresh) { tr.classList.add('fresh'); setTimeout(() => tr.classList.remove('fresh'), 15000); }
+  const combo = comboOf(s);
+  if (!combos.has(combo)) {
+    combos.add(combo);
+    const o = el('option', null, `${s.net} ${s.port} ${s.proto}`);
+    o.value = combo;
+    $('f-proto').appendChild(o);
+  }
+  sessions.set(s.id, {s, tr, cin, cout, cst});
+  tr.classList.toggle('hide', !match(s));
+  $('list').tBodies[0].prepend(tr);     // 新会话在最上面
+}
+function updateRow(rec, s) {
+  const o = rec.s;
+  let ch = false;
+  if (o.bytesIn !== s.bytesIn) { rec.cin.textContent = fmtBytes(s.bytesIn); ch = true; }
+  if (o.bytesOut !== s.bytesOut) { rec.cout.textContent = fmtBytes(s.bytesOut); ch = true; }
+  if (!!o.end !== !!s.end) { setState(rec.cst, s.end); ch = true; }
+  if (ch) { rec.s = s; rec.tr.classList.toggle('hide', !match(s)); }
+  return ch;
+}
+function applyFilter() {
+  F.proto = $('f-proto').value;
+  F.remote = $('f-remote').value.trim().toLowerCase();
+  F.nonzero = $('f-nonzero').checked;
+  let shown = 0;
+  for (const rec of sessions.values()) {
+    const m = match(rec.s);
+    rec.tr.classList.toggle('hide', !m);
+    if (m) shown++;
+  }
+  $('count').textContent = `${shown} / ${sessions.size}`;
+  $('list-empty').hidden = sessions.size > 0;
+  for (const tr of $('sum').tBodies[0].rows) tr.classList.toggle('on', F.remote !== '' && tr.dataset.ip.toLowerCase() === F.remote);
+}
+function rebuildSummary() {
+  const agg = new Map();
+  for (const {s} of sessions.values()) {
+    const ip = ipOf(s.remote);
+    let a = agg.get(ip);
+    if (!a) agg.set(ip, a = {ip, n: 0, ports: new Set(), bytesIn: 0, last: 0, lastIso: s.start});
+    a.n++;
+    a.ports.add(`${s.net}/${s.port}`);
+    a.bytesIn += Number(s.bytesIn) || 0;
+    const t = Date.parse(s.start);
+    if (t > a.last) { a.last = t; a.lastIso = s.start; }
+  }
+  const rows = [...agg.values()].sort((a, b) => b.n - a.n || b.last - a.last);
+  const tb = $('sum').tBodies[0];
+  tb.textContent = '';
+  const portNo = p => parseInt(p.slice(p.indexOf('/') + 1), 10) || 0;
+  for (const a of rows) {
+    const tr = el('tr');
+    tr.tabIndex = 0;
+    tr.dataset.ip = a.ip;
+    tr.classList.toggle('on', F.remote !== '' && a.ip.toLowerCase() === F.remote);
+    tr.appendChild(el('td', 'c-remote', a.ip));
+    tr.appendChild(el('td', 'r', String(a.n)));
+    const tp = el('td');
+    for (const p of [...a.ports].sort((x, y) => portNo(x) - portNo(y))) tp.appendChild(el('span', 'chip', p));
+    tr.appendChild(tp);
+    tr.appendChild(el('td', 'r c-in', fmtBytes(a.bytesIn)));
+    tr.appendChild(el('td', 'c-time', fmtTime(a.lastIso, 'short')));
+    tb.appendChild(tr);
+  }
+  $('sum-empty').hidden = rows.length > 0;
+}
+function setStatus(cls, msg) {
+  $('stat').className = 'stat ' + cls;
+  $('stat-text').textContent = msg;
+}
+async function poll() {
+  if (inflight) return;
+  inflight = true;
+  try {
+    const r = await fetch('/api/sessions', {cache: 'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const list = await r.json();
+    if (!Array.isArray(list)) throw new Error('响应不是数组');
+    let added = 0, changed = false, selChanged = false;
+    for (const s of list) {
+      if (!s || !Number.isInteger(s.id)) continue;
+      const rec = sessions.get(s.id);
+      if (!rec) { addRow(s, !firstPoll); added++; }
+      else if (updateRow(rec, s)) { changed = true; if (sel && sel.id === s.id) selChanged = true; }
+    }
+    if (added || changed) rebuildSummary();
+    if (added || firstPoll) applyFilter();
+    if (selChanged) refreshDetail(sel.id);
+    document.title = `portpot (${sessions.size})`;
+    setStatus('ok', `${sessions.size} 会话 · 更新于 ${fmtTime(new Date(), 'clock')}`);
+  } catch (e) {
+    setStatus('err', '轮询失败: ' + (e && e.message || e));
+  } finally {
+    inflight = false;
+    firstPoll = false;
+  }
+}
+
+// ---------- detail ----------
+function showErr(msg) { $('derr').textContent = msg; $('derr').hidden = !msg; }
+function select(id) {
+  if (!Number.isInteger(id) || (sel && sel.id === id)) return;
+  const rec = sessions.get(id);
+  if (selTr) selTr.classList.remove('sel');
+  selTr = rec ? rec.tr : null;
+  if (selTr) selTr.classList.add('sel');
+  sel = {id, proto: rec ? rec.s.proto : '', rendered: 0, busy: false};
+  $('timeline').textContent = '';
+  $('tl-empty').hidden = true;
+  $('empty').hidden = true;
+  $('dhead').hidden = false;
+  showErr('');
+  refreshDetail(id);
+}
+function refreshDetail(id) {
+  if (!sel || sel.id !== id || sel.busy) return;
+  sel.busy = true;
+  loadDetail(id).finally(() => { if (sel && sel.id === id) sel.busy = false; });
+}
+async function loadDetail(id) {
+  let d;
+  try {
+    const r = await fetch('/api/sessions/' + id, {cache: 'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    d = await r.json();
+    if (!d || typeof d !== 'object') throw new Error('响应不是对象');
+  } catch (e) {
+    if (sel && sel.id === id) showErr(`加载会话 #${id} 失败: ${e && e.message || e}`);
+    return;
+  }
+  if (!sel || sel.id !== id) return;    // 用户已切到别的会话
+  showErr('');
+  renderHead(d, id);
+  const evs = Array.isArray(d.events) ? d.events : [];
+  appendEvents(evs, sel.rendered, d.proto);
+  sel.rendered = evs.length;
+  $('tl-empty').hidden = evs.length > 0;
+}
+function renderHead(d, id) {
+  $('d-id').textContent = '#' + id;
+  $('d-remote').textContent = String(d.remote ?? '');
+  $('d-route').textContent = `${d.net}/${d.port} ${d.proto}`;
+  $('d-start').textContent = fmtTime(d.start, 'full');
+  const t0 = Date.parse(d.start);
+  $('d-end').textContent = d.end
+    ? `${fmtTime(d.end, 'full')} · 历时 ${fmtDur(Date.parse(d.end) - t0)}`
+    : `连接中 · 已 ${fmtDur(Date.now() - t0)}`;
+  $('d-bytes').textContent = `入 ${fmtBytes(d.bytesIn)} (${Number(d.bytesIn) || 0}) · 出 ${fmtBytes(d.bytesOut)} (${Number(d.bytesOut) || 0})`;
+  $('dl-in').href = rawUrl(id, 'in');
+  $('dl-out').href = rawUrl(id, 'out');
+}
+function normEvent(e, proto) {
+  const dir = e && (e.dir === 'in' || e.dir === 'out') ? e.dir : 'note';
+  const ev = {time: e && e.time, dir, text: '', b64: '', total: 0, kinds: [], view: 'text', hint: ''};
+  if (dir === 'note') { ev.text = e && typeof e.text === 'string' ? e.text : '(无内容)'; return ev; }
+  ev.b64 = typeof e.data === 'string' ? e.data : '';
+  ev.total = b64Len(ev.b64);
+  const head = b64Bytes(ev.b64, 256), hs = latin1(head);
+  ev.kinds = detect(hs, proto);
+  if (ev.kinds.includes('tls')) ev.hint = tlsHint(head);
+  ev.view = ev.kinds.includes('tls') || ev.kinds.includes('ber') || !looksText(hs) ? 'hex' : 'text';
+  return ev;
+}
+function appendEvents(evs, from, proto) {
+  const tl = $('timeline');
+  const nearBottom = tl.scrollHeight - tl.scrollTop - tl.clientHeight < 60;
+  const frag = document.createDocumentFragment();
+  for (let i = from; i < evs.length; i++) frag.appendChild(makeEvent(normEvent(evs[i], proto), i));
+  tl.appendChild(frag);
+  if (from > 0 && nearBottom) tl.scrollTop = tl.scrollHeight;   // 实时会话：原本在底部就跟着滚
+}
+const io = new IntersectionObserver(entries => {   // 事件体滚到可视区才渲染
+  for (const en of entries) if (en.isIntersecting) { io.unobserve(en.target); if (!en.target._built) buildBody(en.target); }
+}, {rootMargin: '600px'});
+function effectiveView(body) { return body._view || (defaultView === 'auto' ? body._ev.view : defaultView); }
+function makeEvent(ev, idx) {
+  const box = el('div', 'ev ev-' + ev.dir);
+  const head = el('div', 'ev-head');
+  head.appendChild(el('span', 'ev-idx', '#' + (idx + 1)));
+  const t = el('span', 'ev-time', fmtTime(ev.time, 'clock'));
+  t.title = fmtTime(ev.time, 'full');
+  head.appendChild(t);
+  head.appendChild(el('span', 'ev-dir', DIR_LABEL[ev.dir]));
+  box.appendChild(head);
+  if (ev.dir === 'note') {
+    box.appendChild(el('div', 'ev-notetext', ev.text));
+    return box;
+  }
+  head.appendChild(el('span', 'ev-size', `${fmtBytes(ev.total)} (${ev.total} B)`));
+  if (ev.kinds.length) {
+    const ks = el('span', 'ev-kinds');
+    for (const k of ev.kinds) ks.appendChild(el('b', 'kind kind-' + k, KIND_LABEL[k]));
+    head.appendChild(ks);
+  }
+  const btns = el('span', 'ev-btns');
+  const bTxt = el('button', null, '文本'), bHex = el('button', null, 'HEX'), bCopy = el('button', null, '复制 hex');
+  btns.appendChild(bTxt); btns.appendChild(bHex); btns.appendChild(bCopy);
+  head.appendChild(btns);
+  if (ev.hint) box.appendChild(el('div', 'ev-hint', ev.hint));
+  const body = el('pre', 'ev-body pending', '…');
+  body._ev = ev; body._view = null; body._built = false; body._bTxt = bTxt; body._bHex = bHex;
+  box.appendChild(body);
+  if (ev.total > LIMIT) {
+    const tr = el('div', 'trunc', `已截断：仅显示前 ${fmtBytes(LIMIT)}，本事件共 ${fmtBytes(ev.total)} (${ev.total} B)。`);
+    const a = el('a', null, '下载该方向完整原始数据');
+    a.href = rawUrl(sel.id, ev.dir);
+    a.download = '';
+    tr.appendChild(a);
+    box.appendChild(tr);
+  }
+  const setView = v => { body._view = v; if (body._built) buildBody(body); else updateViewButtons(body); };
+  bTxt.addEventListener('click', () => setView('text'));
+  bHex.addEventListener('click', () => setView('hex'));
+  bCopy.addEventListener('click', () => {
+    copyText(hexDump(b64Bytes(ev.b64, LIMIT))).then(() => {
+      bCopy.textContent = ev.total > LIMIT ? '已复制前 64 KiB' : '已复制';
+      setTimeout(() => { bCopy.textContent = '复制 hex'; }, 1500);
+    }, () => { bCopy.textContent = '复制失败'; });
+  });
+  updateViewButtons(body);
+  io.observe(body);
+  return box;
+}
+function updateViewButtons(body) {
+  const v = effectiveView(body);
+  body._bTxt.classList.toggle('on', v === 'text');
+  body._bHex.classList.toggle('on', v === 'hex');
+}
+function buildBody(body) {
+  const ev = body._ev, view = effectiveView(body);
+  body.textContent = '';
+  body.classList.remove('pending');
+  body.dataset.view = view;
+  if (!ev.total) body.appendChild(el('span', 'ctl', '(空)'));
+  else {
+    const bytes = b64Bytes(ev.b64, LIMIT);
+    if (view === 'hex') body.textContent = hexDump(bytes); else buildText(body, bytes, ev);
+  }
+  body._built = true;
+  updateViewButtons(body);
+}
+function setDefaultView(v) {
+  defaultView = v;
+  for (const id of ['auto', 'text', 'hex']) $('v-' + id).classList.toggle('on', id === v);
+  for (const body of $('timeline').querySelectorAll('pre.ev-body')) {
+    if (body._view) continue;           // 手动指定过的不动
+    if (body._built) buildBody(body); else updateViewButtons(body);
+  }
+}
+function copyText(text) {               // 局域网 http 下没有 navigator.clipboard，退回 execCommand
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  return new Promise((ok, fail) => {
+    const ta = el('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const done = document.execCommand('copy');
+    ta.remove();
+    done ? ok() : fail();
+  });
+}
+
+// ---------- init ----------
+function init() {
+  $('f-proto').addEventListener('change', applyFilter);
+  $('f-remote').addEventListener('input', applyFilter);
+  $('f-nonzero').addEventListener('change', applyFilter);
+  const rowOf = e => e.target.closest('tr');
+  const onRow = (tbody, fn) => {
+    tbody.addEventListener('click', e => { const tr = rowOf(e); if (tr) fn(tr); });
+    tbody.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const tr = rowOf(e); if (tr) { e.preventDefault(); fn(tr); }
+    });
+  };
+  onRow($('list').tBodies[0], tr => select(Number(tr.dataset.id)));
+  onRow($('sum').tBodies[0], tr => {
+    const ip = tr.dataset.ip;
+    $('f-remote').value = F.remote === ip.toLowerCase() ? '' : ip;
+    applyFilter();
+  });
+  $('v-auto').addEventListener('click', () => setDefaultView('auto'));
+  $('v-text').addEventListener('click', () => setDefaultView('text'));
+  $('v-hex').addEventListener('click', () => setDefaultView('hex'));
+  $('auto').addEventListener('change', () => { if ($('auto').checked) poll(); else setStatus('off', '已暂停自动刷新'); });
+  poll();
+  setInterval(() => { if ($('auto').checked) poll(); }, POLL_MS);
+}
+init();
+</script>
+</body>
+</html>

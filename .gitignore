@@ -1,0 +1,6 @@
+portpot.log
+portpot.crt
+portpot.key
+/portpot
+*.exe
+dist/
